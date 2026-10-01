@@ -312,7 +312,7 @@ function prod(){
   <div class="pm"><div class="l">Empresas hoje</div><div class="v"><span class="cu">${(emp[h]||new Set).size}</span></div></div>
   <div class="pm"><div class="l">Etapas avançadas</div><div class="v"><span class="cu">${etp[h]||0}</span></div></div>
   <div class="pm"><div class="l">Média por dia</div><div class="v"><span class="cu">${media}</span></div><div class="tag">dias úteis desde ${fmtD(INICIO)}</div></div>
-  <div class="pm"><div class="l">Novos clientes hoje</div><div class="v"><span class="cu">${DATA.filter(e=>e.primeiro===h).length}</span></div></div>
+  <div class="pm"><div class="l">Novos clientes hoje</div><div class="v"><span class="cu">${DATA.filter(e=>(e.cadastro||e.primeiro)===h).length}</span></div></div>
   <div class="pm"><div class="l">Dias na meta</div><div class="v"><span class="cu">${naMeta}</span><small> / ${diasTot}</small></div></div>`;
   const v=D.map(s=>by[s]||0),m=Math.ceil(Math.max(META+4,...v)/20)*20,w=420,H=200,pl=28,pb=26,pt=16,bw=(w-pl-8)/D.length,yM=H-pb-(H-pb-pt)*META/m;
   let s=`<svg viewBox="0 0 ${w} ${H}" width="100%" role="img" aria-label="Ações registradas por dia">`;
@@ -355,7 +355,7 @@ function watchScroll(){
 }
 function weeks(){
   const h=hoje(),D=[];const c=new Date(h+"T12:00:00");while(D.length<10){const s=c.toISOString().slice(0,10);if(isBiz(s)||s===h)D.unshift(s);c.setDate(c.getDate()-1)}
-  const P={},R={};DATA.forEach(e=>{if(e.primeiro){(isDir(e)?R:P)[e.primeiro]=((isDir(e)?R:P)[e.primeiro]||0)+1}});
+  const P={},R={};DATA.forEach(e=>{const dc=e.cadastro||e.primeiro;if(dc){const o=isDir(e)?R:P;o[dc]=(o[dc]||0)+1}});
   const tot=D.map(d=>(P[d]||0)+(R[d]||0)),m=Math.max(5,Math.ceil(Math.max(...tot)/5)*5),w=360,H=190,pl=28,pb=24,pt=16,bw=(w-pl-8)/D.length,k=(H-pb-pt)/m;
   let s=`<svg viewBox="0 0 ${w} ${H}" width="100%" role="img" aria-label="Novos clientes cadastrados por dia">`;
   for(let g=0;g<=4;g++){const y=H-pb-(H-pb-pt)*g/4;s+=`<line x1="${pl}" x2="${w-4}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl-6}" y="${y+4}" text-anchor="end" font-size="11" fill="var(--muted)">${Math.round(m*g/4)}</text>`}
@@ -366,7 +366,7 @@ function weeks(){
     s+=`<text x="${x+bwid/2}" y="${H-7}" text-anchor="middle" font-size="10.5" fill="${d===h?"var(--fg)":"var(--muted)"}" font-weight="${d===h?700:400}">${d===h?"Hoje":fmtD(d)}</text>`});
   $("weeks").innerHTML=s+"</svg>";
   const nh=tot[tot.length-1],sem=tot.slice(-5).reduce((a,b)=>a+b,0);
-  $("wkCap").innerHTML=`<span class="pill" style="--c:var(--brand-ink)">Prospecção própria</span> <span class="pill" style="--c:var(--accent)">Diretoria</span><br>Hoje: <b>${nh}</b> · últimos 5 dias úteis: <b>${sem}</b> · data = 1º cadastro no pipeline`;
+  $("wkCap").innerHTML=`<span class="pill" style="--c:var(--brand-ink)">Prospecção própria</span> <span class="pill" style="--c:var(--accent)">Diretoria</span><br>Hoje: <b>${nh}</b> · últimos 5 dias úteis: <b>${sem}</b> · conta o dia em que a empresa entrou no pipeline`;
 }
 function table(){
   const r=$("fRota").value,e=$("fEtapa").value,p=$("fPrio").value,o=$("fOrig").value,q=$("fBusca").value.toLowerCase();
