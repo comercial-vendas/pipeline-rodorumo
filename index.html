@@ -144,6 +144,12 @@ tr.dir td:first-child{box-shadow:inset 4px 0 0 var(--dir)}
 #tip ul{margin:0;padding-left:16px;max-height:260px;overflow:hidden}
 #tip .more{color:var(--muted);font-size:12px;margin-top:4px}
 [data-tip]{cursor:help}
+#tip .td{margin:0 0 6px;color:var(--fg);font-size:13px}
+.rg td,.rg th{text-align:center}.rg td:first-child,.rg th:first-child{text-align:left}
+.rg td{font-variant-numeric:tabular-nums;font-size:15px}.rg td b{font-family:var(--display);font-size:18px}
+.rg tr.tot td{border-top:2px solid var(--line);font-weight:700}
+.rg tr.dir td:first-child{color:var(--dir);font-weight:600}
+.rg .z{color:var(--muted)}
 footer{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 14px}
 @media (prefers-reduced-motion:no-preference){.drawer{animation:slide .18s ease-out}@keyframes slide{from{transform:translateX(24px);opacity:.6}}}
 
@@ -199,6 +205,12 @@ body.locked .wrap>*:not(#login){display:none}
       <div class="rows" id="dirFunnel"></div>
       <div class="agenda" id="dirList" style="max-height:260px"></div>
     </div>
+  </section>
+
+  <section class="panel">
+    <h2>Resumo geral de clientes</h2>
+    <div class="tbl"><table class="rg" id="resumoT"></table></div>
+    <div class="tag" style="margin-top:6px">Passe o mouse sobre um número para ver as empresas.</div>
   </section>
 
   <section class="grid3">
@@ -292,8 +304,14 @@ Object.entries(ETAPAS).forEach(([n,t])=>{$("fEtapa").insertAdjacentHTML("beforee
 $("legend").innerHTML=Object.entries(ETAPAS).map(([n,t])=>`<span class="pill" style="--c:${COR(n)}">${n}. ${t}</span>`).join("");
 
 const tipAttr=(title,names)=>names&&names.length?` data-tip="${esc(JSON.stringify({t:title,n:names}))}"`:"";
+const tipD=(title,desc,names)=>` data-tip="${esc(JSON.stringify({t:title,d:desc,n:names||[]}))}"`;
 function bars(el,items,color){const m=Math.max(1,...items.map(x=>x[1]));$(el).innerHTML=items.map(([t,c,col,names])=>`<div class="frow"${tipAttr(t,names)}><span>${esc(t)}</span><div class="bar"><i data-w="${c/m*100}" style="width:${FIRST&&!RM?0:c/m*100}%;background:${col||color}"></i></div><span class="num">${c}</span></div>`).join("")||`<p class="tag">Sem dados.</p>`}
 
+function resumo(){
+  const h=hoje(),G=[["Indicação da Diretoria",DATA.filter(isDir),"dir"],["Prospecção própria",DATA.filter(e=>!isDir(e)),""],["Total",DATA,"tot"]];
+  const C=[["Total",()=>true,"Todas as empresas do grupo."],["Prospecção",e=>e.etapa<=2,"Etapas 1 e 2: identificada ou e-mail enviado, ainda sem conversa."],["Em conversa",e=>e.etapa===3||e.etapa===4,"Etapas 3 e 4: já conversou ou está qualificada."],["Cotação / negociação",e=>e.etapa===5||e.etapa===6,"Etapas 5 e 6: cotação enviada ou negociando."],["Fechados",e=>e.etapa===7,"Etapa 7: virou cliente."],["Perdidos",e=>e.etapa===8,"Etapa 8: perdido."],["Novos hoje",e=>(e.cadastro||e.primeiro)===h,"Empresas cadastradas no pipeline hoje."]];
+  $("resumoT").innerHTML=`<thead><tr><th>Origem</th>${C.map(c=>`<th>${c[0]}</th>`).join("")}</tr></thead><tbody>${G.map(([g,l,cls])=>`<tr class="${cls}"><td>${cls==="dir"?RB+" ":""}${g}</td>${C.map(([c,f,d],i)=>{const m=l.filter(f);return`<td${tipD(`${g} · ${c}`,d,m.map(e=>e.nome))}>${m.length?(i===0?`<b>${m.length}</b>`:m.length):`<span class="z">0</span>`}</td>`}).join("")}</tr>`).join("")}</tbody>`;
+}
 function render(){
   const ativos=DATA.filter(e=>e.etapa<7);
   const em=n=>DATA.filter(e=>e.etapa===n).length;
@@ -302,10 +320,18 @@ function render(){
   const freteNeg=neg.reduce((a,e)=>a+(+e.frete||0),0);
   const fech=DATA.filter(e=>e.etapa===7).reduce((a,e)=>a+(+e.frete||0),0);
   const contatos=DATA.reduce((a,e)=>a+(e.contatos||[]).length,0);
-  const k=[["Empresas no pipeline",DATA.length,`${contatos} contatos`],["Com conversa",DATA.filter(e=>e.etapa>=3&&e.etapa<=7).length,"conversou ou além"],["Cotações abertas",em(5)+em(6),"enviadas ou negociando"],["Clientes fechados",em(7),brl(fech)+"/mês"],["Frete em negociação",brl(freteNeg),"qualificado → negociação",1],["Frete potencial total",brl(fretePipe),"todas as empresas ativas",1]];
-  const dir=DATA.filter(isDir);
-  k.splice(1,0,["Indicações da Diretoria",dir.length,`${dir.filter(e=>e.etapa>=3&&e.etapa<=7).length} com conversa`,"d"]);
-  $("kpis").innerHTML=k.map(([l,v,s,h])=>`<div class="kpi${h==="d"?" dirk":h?" hl":""}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
+  const nm=l=>l.map(e=>e.nome), nv=l=>l.filter(e=>+e.frete).sort((a,b)=>b.frete-a.frete).map(e=>`${e.nome} · ${brl(e.frete)}`);
+  const conv=DATA.filter(e=>e.etapa>=3&&e.etapa<=7), cot=DATA.filter(e=>e.etapa===5||e.etapa===6), fc=DATA.filter(e=>e.etapa===7);
+  const k=[["Empresas no pipeline",DATA.length,`${contatos} contatos`,0,"Todas as empresas cadastradas no pipeline, em qualquer etapa (inclui fechadas e perdidas). Embaixo: total de contatos (pessoas) cadastrados.",[]],
+   ["Com conversa",conv.length,"conversou ou além",0,"Empresas em que já houve conversa de verdade com alguém (etapas 3 a 7: conversou, qualificado, cotação, negociação ou fechado).",nm(conv)],
+   ["Cotações abertas",cot.length,"enviadas ou negociando",0,"Empresas com cotação enviada (etapa 5) ou em negociação / carga teste (etapa 6), aguardando decisão.",nm(cot)],
+   ["Clientes fechados",fc.length,brl(fech)+"/mês",0,"Empresas que viraram cliente (etapa 7). Embaixo: soma do frete mensal estimado desses clientes.",nm(fc)],
+   ["Frete em negociação",brl(freteNeg),"qualificado → negociação",1,"Soma do frete potencial por mês das empresas nas etapas 4 a 6 (qualificado, cotação enviada e negociação). É o dinheiro mais perto de fechar.",nv(neg)],
+   ["Frete potencial total",brl(fretePipe),"todas as empresas ativas",1,"Soma do frete potencial por mês de todas as empresas ainda não fechadas nem perdidas (etapas 1 a 6). Só conta quem tem valor preenchido.",nv(ativos)]];
+  const dir=DATA.filter(isDir), dconv=dir.filter(e=>e.etapa>=3&&e.etapa<=7);
+  k.splice(1,0,["Indicações da Diretoria",dir.length,`${dconv.length} com conversa`,"d","Empresas indicadas pela diretoria. Embaixo: quantas delas já tiveram conversa (etapa 3 em diante).",nm(dconv)]);
+  $("kpis").innerHTML=k.map(([l,v,s,h,d,n])=>`<div class="kpi${h==="d"?" dirk":h?" hl":""}"${tipD(l,d,n)}><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
+  resumo();
   bars("dirFunnel",Object.entries(ETAPAS).map(([n,t])=>{const l=dir.filter(e=>e.etapa===+n);return[`${n}. ${t}`,l.length,COR(n),l.map(e=>e.nome)]}));
   $("dirList").innerHTML=dir.sort((a,b)=>(a.dataProx||"9").localeCompare(b.dataProx||"9")).map(e=>`<div class="ag" data-id="${esc(e.id)}" tabindex="0"><div class="date">${fmtD(e.dataProx)}</div><div><b>${esc(e.nome)}</b><span>${esc(ETAPAS[e.etapa])} · ${esc(e.proximo||"")}</span></div></div>`).join("")||`<p class="tag">Nenhuma indicação ainda.</p>`;
   bars("funnel",Object.entries(ETAPAS).map(([n,t])=>[`${n}. ${t}`,em(+n),COR(n),DATA.filter(e=>e.etapa===+n).map(e=>e.nome)]));
@@ -356,7 +382,7 @@ document.addEventListener("click",ev=>{const r=ev.target.closest&&ev.target.clos
 document.addEventListener("change",async ev=>{if(ev.target.id==="pMeta"&&db){const n=Math.max(1,Math.min(200,+ev.target.value||20));META=n;prod();try{await db.doc("config/painel").set({meta:n})}catch(e){}}});
 (()=>{let cur=null;const tip=()=>$("tip");
   const show=(el,x,y)=>{let d;try{d=JSON.parse(el.dataset.tip)}catch(e){return}
-    const n=d.n||[],max=14;tip().innerHTML=`<b>${esc(d.t)} (${n.length})</b><ul>${n.slice(0,max).map(s=>`<li>${esc(s)}</li>`).join("")}</ul>${n.length>max?`<div class="more">+ ${n.length-max} empresas</div>`:""}`;
+    const n=d.n||[],max=14;tip().innerHTML=`<b>${esc(d.t)}${n.length?` (${n.length})`:""}</b>${d.d?`<p class="td">${esc(d.d)}</p>`:""}<ul>${n.slice(0,max).map(s=>`<li>${esc(s)}</li>`).join("")}</ul>${n.length>max?`<div class="more">+ ${n.length-max} empresas</div>`:""}`;
     tip().classList.add("on");move(x,y)};
   const move=(x,y)=>{const t=tip(),w=t.offsetWidth,h=t.offsetHeight;let L=x+14,T=y+14;if(L+w>innerWidth-8)L=x-w-14;if(T+h>innerHeight-8)T=y-h-14;t.style.left=Math.max(8,L)+"px";t.style.top=Math.max(8,T)+"px"};
   const hide=()=>{cur=null;tip().classList.remove("on")};
